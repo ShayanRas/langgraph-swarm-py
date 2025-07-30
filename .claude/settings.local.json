@@ -4,7 +4,9 @@
       "Bash(git checkout:*)",
       "Bash(git merge:*)",
       "Bash(git reset:*)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(pandoc:*)",
+      "Bash(python3 -m pip install:*)"
     ],
     "deny": []
   }
