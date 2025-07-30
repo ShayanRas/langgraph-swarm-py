@@ -1,0 +1,19 @@
+[project]
+name = "tiktok-swarm"
+version = "0.1.0"
+description = "TikTok Analysis and Video Creation Swarm System"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "langgraph>=0.6.0",
+    "langchain-openai>=0.1.0",
+    "langchain-core>=0.3.40",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "sqlalchemy>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "websockets>=13.0",
+    "httpx>=0.27.0"
+]
+
+[tool.setuptools]
+packages = ["src"]

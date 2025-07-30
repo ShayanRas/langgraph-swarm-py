@@ -1,0 +1,6 @@
+{
+    "dependencies": ["."],
+    "graphs": {
+        "tiktok_swarm": "./src/swarm.py:app"
+    }
+}
