@@ -13,8 +13,8 @@ import asyncio
 # Load environment variables
 load_dotenv()
 
-# Import the swarm app
-from src.swarm import app as swarm_app
+# Import the swarm app getter
+from src.swarm import get_app
 
 # Initialize FastAPI
 app = FastAPI(
@@ -79,6 +79,9 @@ async def chat(request: ChatRequest):
         
         # Create config with thread ID
         config = {"configurable": {"thread_id": thread_id}}
+        
+        # Get the swarm app
+        swarm_app = get_app()
         
         # Invoke the swarm
         result = await asyncio.to_thread(
@@ -154,6 +157,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 swarm_input["active_agent"] = data["active_agent"]
             
             config = {"configurable": {"thread_id": thread_id}}
+            
+            # Get the swarm app
+            swarm_app = get_app()
             
             # Invoke the swarm
             result = await asyncio.to_thread(
