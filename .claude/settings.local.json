@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(git reset:*)",
+      "WebFetch(domain:github.com)"
+    ],
+    "deny": []
+  }
+}
