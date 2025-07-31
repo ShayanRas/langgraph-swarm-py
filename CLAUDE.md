@@ -2,30 +2,106 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Common Development Commands
+## Project Overview
 
-### Testing
+This repository contains:
+1. **langgraph-swarm-py**: The core swarm library for multi-agent systems
+2. **tiktok-swarm**: A two-agent implementation for TikTok analysis and video creation
+
+## TikTok Swarm Application
+
+### Current Architecture
+
+The TikTok Swarm is a multi-agent system with two specialized agents:
+
+1. **AnalysisAgent**: Analyzes TikTok trends, hashtags, and content
+2. **VideoCreationAgent**: Creates video scripts and templates based on analysis
+
+### Running the Application
+
+```bash
+cd tiktok-swarm
+python run_local.py
+```
+
+The API will be available at:
+- Main endpoint: http://localhost:8000
+- API docs: http://localhost:8000/docs
+- WebSocket: ws://localhost:8000/ws
+
+### Project Structure
+
+```
+tiktok-swarm/
+├── src/
+│   ├── agents/
+│   │   ├── analysis_agent.py      # TikTok analysis agent
+│   │   └── video_creation_agent.py # Video creation agent
+│   ├── api/
+│   │   └── main.py               # FastAPI server
+│   ├── tools/
+│   │   └── mock_tools.py         # Mock TikTok tools for development
+│   ├── langgraph_swarm/          # Local copy of swarm library
+│   └── swarm.py                  # Main swarm configuration
+├── run_local.py                  # Server runner script
+└── requirements.txt              # Python dependencies
+```
+
+### Current State
+
+- **Memory**: Using in-memory storage only (MemorySaver for conversation persistence)
+- **Tools**: Mock implementations for development
+- **API**: FastAPI with chat and WebSocket endpoints
+- **Agents**: Basic implementation with handoff capabilities
+
+### API Usage
+
+#### Chat Endpoint
+```bash
+curl -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Analyze trending cooking videos",
+    "thread_id": "optional-thread-id",
+    "active_agent": "AnalysisAgent"
+  }'
+```
+
+#### WebSocket Connection
+```javascript
+const ws = new WebSocket('ws://localhost:8000/ws');
+ws.send(JSON.stringify({
+  message: "Create a video script",
+  active_agent: "VideoCreationAgent"
+}));
+```
+
+### Development Notes
+
+1. **Python Version**: Works with Python 3.10+
+2. **Windows Compatibility**: Use `python` instead of `python3` on Windows
+3. **Import Paths**: Uses relative imports to avoid path issues
+
+## Core Swarm Library (langgraph_swarm)
+
+### Common Development Commands
+
+#### Testing
 - Run all tests: `uv run pytest --disable-socket --allow-unix-socket tests/`
 - Run specific test file: `uv run pytest --disable-socket --allow-unix-socket tests/test_swarm.py`
 - Run tests in watch mode: `uv run ptw . -- tests/`
 - Run a single test: `uv run pytest --disable-socket --allow-unix-socket tests/test_swarm.py::test_function_name`
 
-### Linting and Formatting
+#### Linting and Formatting
 - Run linters: `make lint`
 - Format code: `make format`
 - Check specific files: `uv run ruff check langgraph_swarm/file.py`
 - Format specific files: `uv run ruff format langgraph_swarm/file.py`
 - Type checking: `uv run mypy langgraph_swarm/`
 
-### Development Setup
-This project uses `uv` as the package manager. Key dependencies:
-- Python >=3.10
-- langgraph >=0.6.0,<0.7.0
-- langchain-core >=0.3.40,<0.4.0
+### Architecture Overview
 
-## Architecture Overview
-
-### Core Components
+#### Core Components
 
 The library implements a swarm-style multi-agent system where agents dynamically hand off control based on their specializations. The architecture consists of:
 
@@ -45,7 +121,7 @@ The library implements a swarm-style multi-agent system where agents dynamically
    - `add_active_agent_router()` adds conditional routing based on active agent
    - Automatically creates a `StateGraph` with proper routing between agents
 
-### Key Design Patterns
+#### Key Design Patterns
 
 1. **Dynamic Agent Routing**: The swarm uses conditional edges from START to route to the active agent. If no agent is active, it defaults to the specified `default_active_agent`.
 
@@ -59,7 +135,7 @@ The library implements a swarm-style multi-agent system where agents dynamically
    - Functional API workflows
    - Any `Pregel` object
 
-4. **Memory Integration**: The swarm supports both short-term (checkpointer) and long-term (store) memory through LangGraph's compilation step.
+4. **Memory Integration**: The swarm supports short-term memory (checkpointer) through LangGraph's compilation step.
 
 ### Example Usage Pattern
 ```python
@@ -71,7 +147,7 @@ bob = create_react_agent(model, [create_handoff_tool("Alice")], ...)
 workflow = create_swarm([alice, bob], default_active_agent="Alice")
 
 # 3. Compile with memory
-app = workflow.compile(checkpointer=InMemorySaver())
+app = workflow.compile(checkpointer=MemorySaver())
 ```
 
 ### Extension Points

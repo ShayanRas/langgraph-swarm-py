@@ -52,6 +52,12 @@ class StatusResponse(BaseModel):
 # In-memory storage for threads (replace with database later)
 threads_store = {}
 
+# Removed database setup for now - using in-memory storage
+# @app.on_event("startup")
+# async def startup_event():
+#     """Initialize database on startup"""
+#     await setup_database()
+
 @app.get("/", response_model=StatusResponse)
 async def root():
     """Health check and system status"""
@@ -81,7 +87,7 @@ async def chat(request: ChatRequest):
         config = {"configurable": {"thread_id": thread_id}}
         
         # Get the swarm app
-        swarm_app = get_app()
+        swarm_app = await get_app()
         
         # Invoke the swarm
         result = await asyncio.to_thread(
@@ -159,7 +165,7 @@ async def websocket_endpoint(websocket: WebSocket):
             config = {"configurable": {"thread_id": thread_id}}
             
             # Get the swarm app
-            swarm_app = get_app()
+            swarm_app = await get_app()
             
             # Invoke the swarm
             result = await asyncio.to_thread(
