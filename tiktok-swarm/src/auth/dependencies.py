@@ -9,6 +9,19 @@ from .models import UserInfo, UserContext, TokenValidationError
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
+def _decrypt_ms_token(encrypted_token: Optional[str]) -> Optional[str]:
+    """Decrypt MS token if it exists"""
+    if not encrypted_token:
+        return None
+    
+    try:
+        from src.crypto import decrypt_token
+        return decrypt_token(encrypted_token)
+    except Exception:
+        # If decryption fails, assume it's not encrypted (backwards compatibility)
+        return encrypted_token
+
+
 async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme)
 ) -> UserInfo:
@@ -53,7 +66,8 @@ async def get_user_context(
             "email_confirmed": user.email_confirmed_at is not None,
             "created_at": user.created_at.isoformat() if user.created_at else None,
             **user.user_metadata
-        }
+        },
+        ms_token=_decrypt_ms_token(user.user_metadata.get("tiktok_ms_token"))  # Decrypt MS token
     )
 
 

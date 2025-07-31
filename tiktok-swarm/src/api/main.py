@@ -28,12 +28,33 @@ from src.auth.supabase_client import sign_in_with_password, sign_up, sign_out, r
 from typing import Union
 from fastapi.responses import JSONResponse, HTMLResponse
 
+# Import TikTok session manager
+from src.tiktok.session_manager import get_session_manager
+
+# Import TikTok routes
+from src.api.tiktok_routes import router as tiktok_router
+
 # Initialize FastAPI
 app = FastAPI(
     title="TikTok Swarm API",
     description="API for TikTok Analysis and Video Creation Swarm with Multi-User Support",
     version="0.2.0"
 )
+
+# Initialize TikTok session manager on startup
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services on startup"""
+    session_manager = get_session_manager()
+    await session_manager.start()
+    print("TikTok session manager initialized")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean up on shutdown"""
+    session_manager = get_session_manager()
+    await session_manager.stop()
+    print("TikTok session manager stopped")
 
 # Add CORS middleware with proper auth header support
 app.add_middleware(
@@ -44,6 +65,9 @@ app.add_middleware(
     allow_headers=["*", "Authorization", "authorization"],
     expose_headers=["*"]  # Expose headers for client access
 )
+
+# Include routers
+app.include_router(tiktok_router)
 
 # Request/Response models
 class ChatRequest(BaseModel):
@@ -489,6 +513,127 @@ async def resend_confirmation(request: AuthRequest):
         else:
             raise HTTPException(status_code=500, detail=f"Failed to resend confirmation: {str(e)}")
 
+# TikTok MS Token Management
+class MSTokenRequest(BaseModel):
+    """Request model for setting MS token"""
+    ms_token: str
+    
+class MSTokenResponse(BaseModel):
+    """Response model for MS token operations"""
+    message: str
+    has_token: bool
+    last_updated: Optional[datetime] = None
+
+@app.post("/tiktok/ms-token", response_model=MSTokenResponse)
+async def set_ms_token(
+    request: MSTokenRequest,
+    user: UserInfo = Depends(get_current_user)
+):
+    """Set or update the user's TikTok MS token"""
+    try:
+        from src.crypto import encrypt_token
+        client = get_supabase_client()
+        
+        # Encrypt the MS token before storing
+        encrypted_token = encrypt_token(request.ms_token)
+        
+        # Update user metadata with encrypted MS token
+        response = client.auth.update_user({
+            "data": {
+                "tiktok_ms_token": encrypted_token,
+                "tiktok_ms_token_updated": datetime.utcnow().isoformat()
+            }
+        })
+        
+        return MSTokenResponse(
+            message="MS token updated successfully",
+            has_token=True,
+            last_updated=datetime.utcnow()
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update MS token: {str(e)}")
+
+@app.get("/tiktok/ms-token", response_model=MSTokenResponse)
+async def get_ms_token_status(user: UserInfo = Depends(get_current_user)):
+    """Check if user has a TikTok MS token configured"""
+    try:
+        has_token = bool(user.user_metadata.get("tiktok_ms_token"))
+        last_updated = user.user_metadata.get("tiktok_ms_token_updated")
+        
+        if last_updated:
+            last_updated = datetime.fromisoformat(last_updated)
+        
+        return MSTokenResponse(
+            message="MS token found" if has_token else "No MS token configured",
+            has_token=has_token,
+            last_updated=last_updated
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to check MS token: {str(e)}")
+
+@app.delete("/tiktok/ms-token")
+async def delete_ms_token(user: UserInfo = Depends(get_current_user)):
+    """Delete the user's TikTok MS token"""
+    try:
+        client = get_supabase_client()
+        
+        # Remove MS token from user metadata
+        response = client.auth.update_user({
+            "data": {
+                "tiktok_ms_token": None,
+                "tiktok_ms_token_updated": None
+            }
+        })
+        
+        return {"message": "MS token deleted successfully"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete MS token: {str(e)}")
+
+# Health and monitoring endpoints
+@app.get("/health")
+async def health_check():
+    """Basic health check endpoint"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+@app.get("/health/detailed")
+async def detailed_health():
+    """Detailed health check with component status"""
+    import psutil
+    
+    # Get memory usage
+    process = psutil.Process()
+    memory_info = process.memory_info()
+    
+    # Get TikTok session manager health
+    session_manager = get_session_manager()
+    tiktok_health = await session_manager.health_check()
+    
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "components": {
+            "api": "healthy",
+            "supabase": bool(os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_ANON_KEY")),
+            "openai": bool(os.environ.get("OPENAI_API_KEY")),
+            "tiktok_sessions": tiktok_health
+        },
+        "system": {
+            "memory_usage_mb": round(memory_info.rss / 1024 / 1024, 2),
+            "cpu_percent": psutil.cpu_percent(interval=1),
+            "active_threads": len(asyncio.all_tasks())
+        },
+        "environment": {
+            "environment": os.environ.get("ENVIRONMENT", "unknown"),
+            "encryption_configured": bool(os.environ.get("MS_TOKEN_ENCRYPTION_KEY"))
+        }
+    }
+
 # Test endpoints
 @app.get("/test/health")
 async def test_health():
@@ -534,9 +679,10 @@ async def chat(
                 request.active_agent or "AnalysisAgent"
             )
         
-        # Prepare the input
+        # Prepare the input with user context
         swarm_input = {
-            "messages": [{"role": "user", "content": request.message}]
+            "messages": [{"role": "user", "content": request.message}],
+            "user_context": user_context.to_config_dict()
         }
         
         # If active agent is specified, set it
@@ -742,9 +888,10 @@ async def websocket_endpoint(websocket: WebSocket):
             # Receive message from client
             data = await websocket.receive_json()
             
-            # Process the message
+            # Process the message with user context
             swarm_input = {
-                "messages": [{"role": "user", "content": data.get("message", "")}]
+                "messages": [{"role": "user", "content": data.get("message", "")}],
+                "user_context": user_context.to_config_dict()
             }
             
             if data.get("active_agent"):

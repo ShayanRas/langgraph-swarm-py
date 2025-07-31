@@ -76,6 +76,38 @@ def test_imports():
     except ImportError as e:
         errors.append(f"✗ Failed to import supabase: {e}")
     
+    # Test TikTok dependencies
+    try:
+        from TikTokApi import TikTokApi
+        print("✓ TikTokApi imported successfully")
+    except ImportError as e:
+        errors.append(f"✗ Failed to import TikTokApi: {e}")
+    
+    try:
+        import playwright
+        print("✓ playwright imported successfully")
+    except ImportError as e:
+        errors.append(f"✗ Failed to import playwright: {e}")
+    
+    try:
+        from playwright_stealth import Stealth
+        print("✓ playwright-stealth imported successfully")
+    except ImportError as e:
+        errors.append(f"✗ Failed to import playwright-stealth: {e}")
+    
+    try:
+        import cryptography
+        from cryptography.fernet import Fernet
+        print("✓ cryptography imported successfully")
+    except ImportError as e:
+        errors.append(f"✗ Failed to import cryptography: {e}")
+    
+    try:
+        import psutil
+        print("✓ psutil imported successfully")
+    except ImportError as e:
+        errors.append(f"✗ Failed to import psutil: {e}")
+    
     return errors
 
 if __name__ == "__main__":

@@ -11,7 +11,10 @@
       "WebFetch(domain:langchain-ai.github.io)",
       "Bash(mkdir:*)",
       "Bash(touch:*)",
-      "WebFetch(domain:supabase.com)"
+      "WebFetch(domain:supabase.com)",
+      "mcp__github__get_file_contents",
+      "Bash(find:*)",
+      "Bash(python:*)"
     ],
     "deny": []
   }

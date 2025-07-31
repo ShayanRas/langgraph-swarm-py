@@ -14,14 +14,36 @@ services:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
       
+      # Token Encryption
+      - MS_TOKEN_ENCRYPTION_KEY=${MS_TOKEN_ENCRYPTION_KEY}
+      
+      # TikTok Stealth Configuration
+      - TIKTOK_STEALTH_LEVEL=${TIKTOK_STEALTH_LEVEL:-aggressive}
+      - TIKTOK_HEADLESS=${TIKTOK_HEADLESS:-false}
+      - TIKTOK_BROWSER=${TIKTOK_BROWSER:-chromium}
+      - TIKTOK_RANDOM_BROWSER=${TIKTOK_RANDOM_BROWSER:-true}
+      - TIKTOK_MAX_SESSIONS_PER_USER=${TIKTOK_MAX_SESSIONS_PER_USER:-2}
+      - TIKTOK_SESSION_TIMEOUT=${TIKTOK_SESSION_TIMEOUT:-300}
+      - TIKTOK_PROXY_ENABLED=${TIKTOK_PROXY_ENABLED:-false}
+      - TIKTOK_PROXY_URL=${TIKTOK_PROXY_URL}
+      
       # Application Configuration
       - ENVIRONMENT=development
       - LOG_LEVEL=INFO
+      - DOCKER_CONTAINER=true
     volumes:
       # Mount source code for hot reloading in development
       - ./src:/app/src:ro
       # Mount .env file if it exists
       - ./.env:/app/.env:ro
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '1.0'
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
       interval: 30s

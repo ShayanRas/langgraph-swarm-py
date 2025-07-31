@@ -5,6 +5,7 @@ from langchain_openai import ChatOpenAI
 from langgraph_swarm import create_swarm
 from src.agents.analysis_agent import create_analysis_agent
 from src.agents.video_creation_agent import create_video_creation_agent
+from src.state import TikTokSwarmState
 
 # Load environment variables
 load_dotenv()
@@ -47,7 +48,8 @@ def get_builder():
         agents = get_agents()
         builder = create_swarm(
             agents=list(agents),
-            default_active_agent="AnalysisAgent"
+            default_active_agent="AnalysisAgent",
+            state_schema=TikTokSwarmState
         )
     return builder
 

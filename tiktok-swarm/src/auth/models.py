@@ -41,6 +41,7 @@ class UserContext(BaseModel):
     email: str
     permissions: List[str] = []
     metadata: Dict[str, Any] = {}
+    ms_token: Optional[str] = None  # TikTok MS token from user metadata
     
     def to_config_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for LangGraph config"""
@@ -48,7 +49,8 @@ class UserContext(BaseModel):
             "user_id": self.user_id,
             "user_email": self.email,
             "permissions": self.permissions,
-            "user_metadata": self.metadata
+            "user_metadata": self.metadata,
+            "ms_token": self.ms_token
         }
 
 
