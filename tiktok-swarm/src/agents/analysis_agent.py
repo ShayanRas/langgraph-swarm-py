@@ -3,9 +3,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 from langgraph_swarm import create_handoff_tool
 from src.tools.mock_tools import (
-    analyze_tiktok_url,
-    analyze_trend,
-    search_trending_sounds
+    analyze_trend  # Example tool
 )
 
 
@@ -27,9 +25,7 @@ def create_analysis_agent(model: ChatOpenAI):
     
     # Define the agent's tools
     tools = [
-        analyze_tiktok_url,
-        analyze_trend,
-        search_trending_sounds,
+        analyze_trend,  # Example tool
         transfer_to_video_creation
     ]
     

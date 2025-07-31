@@ -3,8 +3,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 from langgraph_swarm import create_handoff_tool
 from src.tools.mock_tools import (
-    create_video_spec,
-    generate_script
+    generate_script  # Example tool
 )
 
 
@@ -26,8 +25,7 @@ def create_video_creation_agent(model: ChatOpenAI):
     
     # Define the agent's tools
     tools = [
-        create_video_spec,
-        generate_script,
+        generate_script,  # Example tool
         transfer_to_analysis
     ]
     
