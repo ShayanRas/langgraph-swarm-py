@@ -1,19 +1,99 @@
 [project]
 name = "tiktok-swarm"
 version = "0.1.0"
-description = "TikTok Analysis and Video Creation Swarm System"
-requires-python = ">=3.10,<3.13"
+description = "Multi-agent system for TikTok analysis and video creation using LangGraph Swarm"
+requires-python = ">=3.11,<3.12"
+
 dependencies = [
-    "langgraph>=0.6.0",
+    # LangGraph and LangChain
+    "langgraph>=0.6.0,<0.7.0",
+    "langgraph-prebuilt",
+    "langgraph-swarm>=0.0.14",
     "langchain-openai>=0.1.0",
-    "langchain-core>=0.3.40",
+    "langchain-core>=0.3.40,<0.4.0",
+    "langchain-mcp-adapters>=0.1.0",
+    
+    # Database and persistence
+    "langgraph-checkpoint-postgres>=2.0.0",
+    "asyncpg>=0.29.0",
+    "psycopg2-binary>=2.9.0",
+    "sqlalchemy>=2.0.0",
+    
+    # Web framework
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
-    "sqlalchemy>=2.0.0",
-    "python-dotenv>=1.0.0",
     "websockets>=13.0",
-    "httpx>=0.27.0"
+    "httpx>=0.27.0",
+    
+    # Authentication
+    "supabase>=2.10.0",
+    "gotrue>=2.10.0",
+    
+    # Utilities
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+    "typing-extensions>=4.8.0",
+    
+    # Pydantic extras
+    "email-validator>=2.0.0",  # Required for EmailStr in auth models
 ]
 
-[tool.setuptools]
-packages = ["src"]
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.1.0",
+    "mypy>=1.5.0",
+    "pre-commit>=3.5.0",
+]
+
+# Build system not needed for applications (only for libraries)
+# [build-system]
+# requires = ["hatchling"]
+# build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+]
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"]  # imported but unused
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+addopts = "-ra -q --strict-markers"
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["*/__init__.py", "*/tests/*"]
+
+# [tool.hatch.build]
+# include = [
+#     "src/**/*.py",
+#     "README.md",
+#     "LICENSE",
+# ]

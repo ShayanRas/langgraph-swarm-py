@@ -1,0 +1,39 @@
+# Production-specific overrides
+services:
+  tiktok-swarm:
+    image: tiktok-swarm:latest
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=WARNING
+    volumes: []  # No source mounting in production
+    restart: always
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    
+  # Nginx reverse proxy for production
+  nginx:
+    image: nginx:alpine
+    container_name: tiktok-swarm-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - tiktok-swarm
+    networks:
+      - swarm-network
+    restart: always
+    
+  # Remove development services
+  postgres:
+    profiles:
+      - never  # Don't run in production

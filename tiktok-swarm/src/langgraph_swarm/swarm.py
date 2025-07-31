@@ -1,7 +1,7 @@
 from typing import Literal, Optional, Union, cast, get_args, get_origin
 from warnings import warn
 
-from langgraph._internal._typing import DeprecatedKwargs
+# Removed internal import that's not available in newer versions
 from langgraph.graph import START, MessagesState, StateGraph
 from langgraph.pregel import Pregel
 from typing_extensions import Any, TypeVar, Unpack
@@ -151,7 +151,7 @@ def create_swarm(  # noqa: D417
     default_active_agent: str,
     state_schema: StateSchemaType = SwarmState,
     context_schema: type[Any] | None = None,
-    **deprecated_kwargs: Unpack[DeprecatedKwargs],
+    **deprecated_kwargs: Any,
 ) -> StateGraph:
     """Create a multi-agent swarm.
 

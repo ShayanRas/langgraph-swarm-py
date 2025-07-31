@@ -1,7 +1,7 @@
 """Analysis Agent for TikTok content analysis"""
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
-from src.langgraph_swarm import create_handoff_tool
+from langgraph_swarm import create_handoff_tool
 from src.tools.mock_tools import (
     analyze_tiktok_url,
     analyze_trend,

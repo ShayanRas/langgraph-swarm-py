@@ -1,0 +1,55 @@
+# Development-specific overrides
+services:
+  tiktok-swarm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - INSTALL_DEV=true
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - PYTHONUNBUFFERED=1
+      - DOCKER_CONTAINER=true
+    volumes:
+      # Mount entire source directory for hot reloading
+      - ./src:/app/src
+      - ./tests:/app/tests
+      - ./.env:/app/.env:ro
+      # Mount pyproject.toml for dependency updates
+      - ./pyproject.toml:/app/pyproject.toml:ro
+    command: ["uv", "run", "python", "run_local.py"]
+    
+  # Local PostgreSQL for development
+  postgres:
+    profiles: []  # Always run in dev
+    
+  # Adminer for database management
+  adminer:
+    image: adminer:latest
+    container_name: tiktok-swarm-adminer
+    ports:
+      - "8080:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=postgres
+    networks:
+      - swarm-network
+    depends_on:
+      - postgres
+      
+  # Redis for caching (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: tiktok-swarm-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - swarm-network
+    profiles:
+      - cache
+
+volumes:
+  redis_data:

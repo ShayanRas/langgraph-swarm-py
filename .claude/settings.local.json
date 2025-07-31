@@ -9,7 +9,9 @@
       "Bash(python3 -m pip install:*)",
       "Bash(cp:*)",
       "WebFetch(domain:langchain-ai.github.io)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(touch:*)",
+      "WebFetch(domain:supabase.com)"
     ],
     "deny": []
   }

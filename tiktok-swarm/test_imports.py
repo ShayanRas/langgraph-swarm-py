@@ -1,65 +1,37 @@
-"""Test if all imports work correctly"""
-import sys
-import os
-
-# Add current directory to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-print("Testing imports...")
-print(f"Python version: {sys.version}")
-print(f"Current directory: {os.getcwd()}")
-
+"""Test what's available in langgraph.prebuilt"""
 try:
-    print("\n1. Testing basic imports...")
-    import fastapi
-    print("✓ FastAPI imported")
-    
-    import uvicorn
-    print("✓ Uvicorn imported")
-    
-    import langchain_openai
-    print("✓ LangChain OpenAI imported")
-    
-    import dotenv
-    print("✓ Dotenv imported")
-    
-except ImportError as e:
-    print(f"✗ Import error: {e}")
-    print("Please install requirements: pip install -r requirements.txt")
-    sys.exit(1)
-
-try:
-    print("\n2. Testing LangGraph imports...")
     import langgraph
-    print("✓ LangGraph imported")
+    print(f"LangGraph version: {langgraph.__version__}")
     
-    from langgraph.prebuilt import create_react_agent
-    print("✓ create_react_agent imported")
+    import langgraph.prebuilt
+    print("\nAvailable in langgraph.prebuilt:")
+    for attr in dir(langgraph.prebuilt):
+        if not attr.startswith('_'):
+            print(f"  - {attr}")
     
-except ImportError as e:
-    print(f"✗ LangGraph import error: {e}")
-    print("This might be a version issue with Python 3.13")
-
-try:
-    print("\n3. Testing local imports...")
-    from src.tools.mock_tools import analyze_tiktok_url
-    print("✓ Mock tools imported")
+    # Try to find InjectedState
+    print("\nSearching for InjectedState...")
     
-    from src.agents.analysis_agent import create_analysis_agent
-    print("✓ Analysis agent imported")
+    # Check if it's in langgraph.prebuilt.tool_node
+    try:
+        from langgraph.prebuilt.tool_node import InjectedState
+        print("✓ Found InjectedState in langgraph.prebuilt.tool_node")
+    except ImportError as e:
+        print(f"✗ Not in langgraph.prebuilt.tool_node: {e}")
     
-    from src.agents.video_creation_agent import create_video_creation_agent
-    print("✓ Video creation agent imported")
+    # Check if it's directly in langgraph.prebuilt
+    try:
+        from langgraph.prebuilt import InjectedState
+        print("✓ Found InjectedState in langgraph.prebuilt")
+    except ImportError as e:
+        print(f"✗ Not in langgraph.prebuilt: {e}")
+        
+    # Check the actual module structure
+    print("\nChecking langgraph.prebuilt.__all__:")
+    if hasattr(langgraph.prebuilt, '__all__'):
+        print(langgraph.prebuilt.__all__)
     
-except ImportError as e:
-    print(f"✗ Local import error: {e}")
-    
-print("\n4. Testing API imports...")
-try:
-    from src.api.main import app
-    print("✓ FastAPI app imported successfully!")
-    print("\nYou can run the API server with: python run_local.py")
-except ImportError as e:
-    print(f"✗ API import error: {e}")
-
-print("\nImport test complete!")
+except Exception as e:
+    print(f"Error: {e}")
+    import traceback
+    traceback.print_exc()

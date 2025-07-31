@@ -5,7 +5,17 @@ from typing import Annotated, Any
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import BaseTool, InjectedToolCallId, tool
 from langgraph.graph.state import CompiledStateGraph
-from langgraph.prebuilt import InjectedState, ToolNode
+from langgraph.prebuilt import ToolNode
+# InjectedState workaround for compatibility
+try:
+    from langgraph.prebuilt import InjectedState
+except ImportError:
+    try:
+        from langgraph.prebuilt.tool_node import InjectedState
+    except ImportError:
+        # If InjectedState is not available, we'll skip the annotation
+        # This maintains compatibility with different LangGraph versions
+        InjectedState = None
 from langgraph.types import Command
 from pydantic import BaseModel
 
@@ -67,27 +77,49 @@ def create_handoff_tool(
     if description is None:
         description = f"Ask agent '{agent_name}' for help"
 
-    @tool(name, description=description)
-    def handoff_to_agent(
-        # Annotation is typed as Any instead of StateLike. StateLike
-        # trigger validation issues from Pydantic / langchain_core interaction.
-        # https://github.com/langchain-ai/langchain/issues/32067
-        state: Annotated[Any, InjectedState],
-        tool_call_id: Annotated[str, InjectedToolCallId],
-    ) -> Command:
-        tool_message = ToolMessage(
-            content=f"Successfully transferred to {agent_name}",
-            name=name,
-            tool_call_id=tool_call_id,
-        )
-        return Command(
-            goto=agent_name,
-            graph=Command.PARENT,
-            update={
-                "messages": [*_get_field(state, "messages"), tool_message],
-                "active_agent": agent_name,
-            },
-        )
+    # Handle different versions of LangGraph
+    if InjectedState is not None:
+        @tool(name, description=description)
+        def handoff_to_agent(
+            # Annotation is typed as Any instead of StateLike. StateLike
+            # trigger validation issues from Pydantic / langchain_core interaction.
+            # https://github.com/langchain-ai/langchain/issues/32067
+            state: Annotated[Any, InjectedState],
+            tool_call_id: Annotated[str, InjectedToolCallId],
+        ) -> Command:
+            tool_message = ToolMessage(
+                content=f"Successfully transferred to {agent_name}",
+                name=name,
+                tool_call_id=tool_call_id,
+            )
+            return Command(
+                goto=agent_name,
+                graph=Command.PARENT,
+                update={
+                    "messages": [*_get_field(state, "messages"), tool_message],
+                    "active_agent": agent_name,
+                },
+            )
+    else:
+        # Fallback for when InjectedState is not available
+        @tool(name, description=description)
+        def handoff_to_agent(
+            state: Any,  # State will be injected by LangGraph
+            tool_call_id: Annotated[str, InjectedToolCallId],
+        ) -> Command:
+            tool_message = ToolMessage(
+                content=f"Successfully transferred to {agent_name}",
+                name=name,
+                tool_call_id=tool_call_id,
+            )
+            return Command(
+                goto=agent_name,
+                graph=Command.PARENT,
+                update={
+                    "messages": [*_get_field(state, "messages"), tool_message],
+                    "active_agent": agent_name,
+                },
+            )
 
     handoff_to_agent.metadata = {METADATA_KEY_HANDOFF_DESTINATION: agent_name}
     return handoff_to_agent
