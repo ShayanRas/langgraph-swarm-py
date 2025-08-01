@@ -4,144 +4,100 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This repository contains:
-1. **langgraph-swarm-py**: The core swarm library for multi-agent systems
-2. **tiktok-swarm**: A two-agent implementation for TikTok analysis and video creation
+This repository contains two main components:
+1. **langgraph-swarm**: A Python library for creating swarm-style multi-agent systems (root directory)
+2. **tiktok-swarm**: A production application implementing TikTok analysis and video creation agents
 
-## TikTok Swarm Application
+## Development Commands
 
-### Current Architecture
-
-The TikTok Swarm is a multi-agent system with two specialized agents:
-
-1. **AnalysisAgent**: Analyzes TikTok trends, hashtags, and content
-2. **VideoCreationAgent**: Creates video scripts and templates based on analysis
-
-### Running the Application
+### Core Library (langgraph-swarm)
 
 ```bash
+# Testing
+make test                           # Run all tests with socket restrictions
+make test TEST_FILE=tests/test_swarm.py::test_function_name  # Run specific test
+make test_watch                     # Run tests in watch mode
+uv run pytest --disable-socket --allow-unix-socket tests/  # Direct pytest
+
+# Linting and Formatting
+make lint                          # Run all linters (ruff, mypy)
+make format                        # Auto-format code
+make lint_diff                     # Check only changed files from master
+make format_diff                   # Format only changed files from master
+
+# Development
+uv run ruff check langgraph_swarm/specific_file.py  # Check specific file
+uv run ruff format langgraph_swarm/specific_file.py # Format specific file
+uv run mypy langgraph_swarm/      # Type checking
+```
+
+### TikTok Swarm Application
+
+```bash
+# Local Development
 cd tiktok-swarm
-python run_local.py
+python run_local.py               # Run API server on port 7000
+
+# Docker Development
+docker-compose up                 # Run with all services
+docker-compose down              # Stop all services
+docker-compose up --build        # Rebuild and run
+
+# LangGraph Studio
+langgraph dev                    # Visual debugging interface
+
+# API Testing
+curl http://localhost:7000/      # Health check
+curl -X POST http://localhost:7000/chat -H "Content-Type: application/json" -d '{"message": "test"}'
 ```
 
-The API will be available at:
-- Main endpoint: http://localhost:8000
-- API docs: http://localhost:8000/docs
-- WebSocket: ws://localhost:8000/ws
+## Architecture Overview
 
-### Project Structure
+### Core Swarm Library Architecture
 
-```
-tiktok-swarm/
-├── src/
-│   ├── agents/
-│   │   ├── analysis_agent.py      # TikTok analysis agent
-│   │   └── video_creation_agent.py # Video creation agent
-│   ├── api/
-│   │   └── main.py               # FastAPI server
-│   ├── tools/
-│   │   └── mock_tools.py         # Mock TikTok tools for development
-│   ├── langgraph_swarm/          # Local copy of swarm library
-│   └── swarm.py                  # Main swarm configuration
-├── run_local.py                  # Server runner script
-└── requirements.txt              # Python dependencies
-```
-
-### Current State
-
-- **Memory**: Using in-memory storage only (MemorySaver for conversation persistence)
-- **Tools**: Mock implementations for development
-- **API**: FastAPI with chat and WebSocket endpoints
-- **Agents**: Basic implementation with handoff capabilities
-
-### API Usage
-
-#### Chat Endpoint
-```bash
-curl -X POST http://localhost:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "message": "Analyze trending cooking videos",
-    "thread_id": "optional-thread-id",
-    "active_agent": "AnalysisAgent"
-  }'
-```
-
-#### WebSocket Connection
-```javascript
-const ws = new WebSocket('ws://localhost:8000/ws');
-ws.send(JSON.stringify({
-  message: "Create a video script",
-  active_agent: "VideoCreationAgent"
-}));
-```
-
-### Development Notes
-
-1. **Python Version**: Works with Python 3.10+
-2. **Windows Compatibility**: Use `python` instead of `python3` on Windows
-3. **Import Paths**: Uses relative imports to avoid path issues
-
-## Core Swarm Library (langgraph_swarm)
-
-### Common Development Commands
-
-#### Testing
-- Run all tests: `uv run pytest --disable-socket --allow-unix-socket tests/`
-- Run specific test file: `uv run pytest --disable-socket --allow-unix-socket tests/test_swarm.py`
-- Run tests in watch mode: `uv run ptw . -- tests/`
-- Run a single test: `uv run pytest --disable-socket --allow-unix-socket tests/test_swarm.py::test_function_name`
-
-#### Linting and Formatting
-- Run linters: `make lint`
-- Format code: `make format`
-- Check specific files: `uv run ruff check langgraph_swarm/file.py`
-- Format specific files: `uv run ruff format langgraph_swarm/file.py`
-- Type checking: `uv run mypy langgraph_swarm/`
-
-### Architecture Overview
-
-#### Core Components
-
-The library implements a swarm-style multi-agent system where agents dynamically hand off control based on their specializations. The architecture consists of:
+The library implements a swarm-style multi-agent system where agents dynamically hand off control based on their specializations:
 
 1. **SwarmState** (`langgraph_swarm/swarm.py:12-18`): 
-   - Extends `MessagesState` from LangGraph
-   - Tracks the currently active agent via `active_agent` field
+   - Extends LangGraph's `MessagesState`
+   - Tracks active agent via `active_agent` field
    - Maintains conversation history across all agents
 
-2. **Handoff Tools** (`langgraph_swarm/handoff.py`):
-   - `create_handoff_tool()` creates tools that allow agents to transfer control
-   - Uses LangGraph's `Command` system to update both message history and active agent
-   - Tool names follow pattern: `transfer_to_<agent_name>`
-   - Handoff destinations are tracked via metadata
+2. **Handoff System** (`langgraph_swarm/handoff.py`):
+   - `create_handoff_tool()` creates tools for agent-to-agent transfers
+   - Uses LangGraph's `Command` system for state updates
+   - Handoff destinations tracked via metadata
 
 3. **Swarm Creation** (`langgraph_swarm/swarm.py`):
-   - `create_swarm()` orchestrates multiple agents into a unified system
-   - `add_active_agent_router()` adds conditional routing based on active agent
-   - Automatically creates a `StateGraph` with proper routing between agents
+   - `create_swarm()` orchestrates multiple agents
+   - `add_active_agent_router()` adds conditional routing
+   - Automatically creates StateGraph with proper routing
 
-#### Key Design Patterns
+### TikTok Swarm Architecture
 
-1. **Dynamic Agent Routing**: The swarm uses conditional edges from START to route to the active agent. If no agent is active, it defaults to the specified `default_active_agent`.
+The application demonstrates real-world usage with two specialized agents:
 
-2. **State Preservation**: When agents hand off control, they:
-   - Pass the full message history
-   - Update the active agent in the state
-   - Add a tool message confirming the handoff
+1. **Agent System** (`tiktok-swarm/src/agents/`):
+   - **AnalysisAgent**: TikTok content analysis with stealth browser automation
+   - **VideoCreationAgent**: Script and template generation
+   - Automatic handoff based on task type
 
-3. **Flexible Agent Support**: Agents can be:
-   - LangGraph `CompiledStateGraph` instances
-   - Functional API workflows
-   - Any `Pregel` object
+2. **TikTok Integration** (`tiktok-swarm/src/tiktok/`):
+   - **SessionManager**: Manages browser sessions with anti-bot measures
+   - **Stealth Features**: Playwright-stealth, browser rotation, proxy support
+   - **Error Handling**: Comprehensive error classification and recovery
 
-4. **Memory Integration**: The swarm supports short-term memory (checkpointer) through LangGraph's compilation step.
+3. **API Layer** (`tiktok-swarm/src/api/`):
+   - FastAPI with WebSocket support
+   - Supabase authentication integration
+   - Thread-based conversation management
 
-### Example Usage Pattern
+## Key Implementation Patterns
+
+### Agent Creation Pattern
 ```python
 # 1. Create agents with handoff tools
-alice = create_react_agent(model, [tool, create_handoff_tool("Bob")], ...)
-bob = create_react_agent(model, [create_handoff_tool("Alice")], ...)
+alice = create_react_agent(model, [tool, create_handoff_tool("Bob")])
+bob = create_react_agent(model, [create_handoff_tool("Alice")])
 
 # 2. Create swarm
 workflow = create_swarm([alice, bob], default_active_agent="Alice")
@@ -150,133 +106,133 @@ workflow = create_swarm([alice, bob], default_active_agent="Alice")
 app = workflow.compile(checkpointer=MemorySaver())
 ```
 
-### Extension Points
+### Error Handling Pattern
+All TikTok tools follow a consistent error handling pattern:
+- Parse and classify errors (statusCode values)
+- Preserve raw error messages
+- Provide possible causes and suggestions
+- Log with appropriate detail levels
 
-1. **Custom Handoff Tools**: Override `create_handoff_tool()` to:
-   - Add task descriptions for the next agent
-   - Filter which messages to pass
-   - Customize tool names/descriptions
+### Stealth Configuration
+TikTok operations support multiple stealth levels:
+- `none`: No stealth features
+- `moderate`: Basic anti-detection
+- `aggressive`: Full stealth with human-like behavior
+- `paranoid`: Maximum stealth with all features enabled
 
-2. **Custom Agent State**: Use different message keys per agent by:
-   - Creating custom state schemas
-   - Implementing state transformation wrappers
-   - Using `add_active_agent_router()` manually
+## Environment Configuration
 
-3. **Agent Discovery**: The `get_handoff_destinations()` function automatically discovers handoff connections by inspecting agent tool nodes.
-
-## MCP (Model Context Protocol) Tool Integration
-
-### Background
-MCP (Model Context Protocol) is a standard for creating tool servers that can be consumed by AI agents. It allows you to:
-- Create language-agnostic tool servers
-- Run tools in isolated processes for security
-- Dynamically load/unload tools at runtime
-- Share tools across different AI systems
-
-### Setting Up MCP Tools with Swarm Agents
-
-#### 1. Install Required Dependencies
+### Required Environment Variables
 ```bash
-pip install langchain-mcp-adapters
+OPENAI_API_KEY=your_key              # Required for all agents
 ```
 
-#### 2. Basic MCP Integration
+### Optional TikTok Swarm Variables
+```bash
+# Supabase Authentication
+SUPABASE_URL=https://project.supabase.co
+SUPABASE_ANON_KEY=your_anon_key
+
+# TikTok Configuration
+TIKTOK_STEALTH_LEVEL=aggressive      # none|moderate|aggressive|paranoid
+TIKTOK_HEADLESS=false               # Run browser in headed mode
+TIKTOK_BROWSER=chromium             # chromium|firefox|webkit
+MS_TOKEN_ENCRYPTION_KEY=your_key    # For token encryption
+
+# Docker/Server
+PORT=7000                           # API server port
+```
+
+## Docker Deployment
+
+### Headed Browser Support
+The Docker setup includes Xvfb for running headed browsers in containers:
+- Automatically starts when `TIKTOK_HEADLESS=false`
+- No GUI infrastructure needed on server
+- Virtual display at :99
+
+### Resource Requirements
+- Memory: 2GB recommended (1GB minimum)
+- CPU: 2 cores recommended
+- Storage: ~2GB for browser binaries
+
+## Testing Strategies
+
+### Unit Tests
+- Use `pytest` with socket restrictions for security
+- Mock external services in tests
+- Test files follow `test_*.py` naming convention
+
+### Integration Testing
+```bash
+# Test authentication flow
+cd tiktok-swarm
+./test_auth_curl.sh
+
+# Test TikTok endpoints
+curl -X POST http://localhost:7000/api/tiktok/search \
+  -H "Content-Type: application/json" \
+  -d '{"query": "cooking", "stealth_mode": true}'
+```
+
+## MCP Tool Integration
+
+The swarm supports Model Context Protocol (MCP) tools:
+
 ```python
+# Initialize MCP client
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from langgraph.prebuilt import create_react_agent
-from langgraph_swarm import create_handoff_tool, create_swarm
 
-# Initialize MCP client with servers
-async def setup_mcp_tools():
-    client = MultiServerMCPClient({
-        "filesystem": {
-            "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
-            "transport": "stdio"
-        },
-        "github": {
-            "command": "npx", 
-            "args": ["-y", "@modelcontextprotocol/server-github"],
-            "transport": "stdio",
-            "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": os.getenv("GITHUB_TOKEN")}
-        }
-    })
-    return await client.get_tools()
+client = MultiServerMCPClient({
+    "filesystem": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+        "transport": "stdio"
+    }
+})
 
-# Create agents with MCP tools
-async def create_mcp_swarm():
-    mcp_tools = await setup_mcp_tools()
-    
-    # Filter tools for each agent
-    alice_tools = [t for t in mcp_tools if t.name.startswith("filesystem.")]
-    alice_tools.append(create_handoff_tool("Bob"))
-    
-    alice = create_react_agent(
-        model, alice_tools, 
-        prompt="You are Alice with file system access.",
-        name="Alice"
-    )
-    
-    # Similar setup for other agents...
+# Get tools and assign to agents
+mcp_tools = await client.get_tools()
 ```
 
-#### 3. Creating Custom MCP Servers
-```python
-# mcp_server.py
-from mcp.server.fastmcp import FastMCP
+## Common Issues and Solutions
 
-mcp = FastMCP("CustomTools")
+### Port Conflicts
+- Default port changed to 7000 (from 8000)
+- Configure via `PORT` environment variable
+- Update docker-compose.yml port mappings
 
-@mcp.tool()
-def custom_operation(param: str) -> str:
-    """Perform a custom operation"""
-    return f"Processed: {param}"
+### TikTok Bot Detection
+- Use aggressive or paranoid stealth mode
+- Enable proxy support for IP rotation
+- Implement retry logic with backoff
 
-if __name__ == "__main__":
-    mcp.run()
-```
+### Memory Management
+- Browser sessions auto-cleanup after timeout
+- Configure `TIKTOK_MAX_SESSIONS_PER_USER`
+- Monitor Docker container memory usage
 
-Then add to your MCP client configuration:
-```python
-"custom": {
-    "command": "python",
-    "args": ["./mcp_server.py"],
-    "transport": "stdio"
-}
-```
+## Extension Points
 
-#### 4. Advanced Pattern: Role-Based Tool Assignment
-```python
-class MCPToolRouter:
-    """Assigns MCP tools based on agent roles"""
-    
-    def __init__(self, mcp_client):
-        self.mcp_client = mcp_client
-        self.tool_categories = {
-            "technical": ["filesystem", "code", "shell"],
-            "data": ["database", "analytics"],
-            "external": ["github", "slack", "web"]
-        }
-    
-    async def get_tools_for_role(self, role: str):
-        all_tools = await self.mcp_client.get_tools()
-        if role in self.tool_categories:
-            prefixes = self.tool_categories[role]
-            return [t for t in all_tools 
-                   if any(t.name.startswith(f"{p}.") for p in prefixes)]
-        return []
-```
+### Custom Agents
+1. Create agent file in `src/agents/`
+2. Implement with appropriate tools and handoffs
+3. Add to swarm configuration in `src/swarm.py`
 
-### Common MCP Servers
-- **Filesystem**: `@modelcontextprotocol/server-filesystem`
-- **GitHub**: `@modelcontextprotocol/server-github`
-- **PostgreSQL**: `@modelcontextprotocol/server-postgres`
-- **Slack**: `@modelcontextprotocol/server-slack`
-- **Google Drive**: `@modelcontextprotocol/server-gdrive`
+### Custom Tools
+1. Inherit from `BaseTikTokTool` for TikTok operations
+2. Implement `_execute` method with error handling
+3. Register in agent tool list
 
-### Best Practices
-1. **Security**: Run MCP servers with minimal required permissions
-2. **Error Handling**: Wrap MCP tool calls in try-catch blocks
-3. **Tool Naming**: Use clear, descriptive names for custom MCP tools
-4. **Documentation**: Document each MCP tool's purpose and parameters
-5. **Testing**: Test MCP servers independently before integration
+### Authentication Providers
+1. Implement provider in `src/auth/providers/`
+2. Follow `BaseAuthProvider` interface
+3. Add to auth configuration
+
+## Code Style Guidelines
+
+- Match existing patterns in the codebase
+- Use type hints for all function signatures
+- Follow error handling patterns (preserve details)
+- Implement proper logging at appropriate levels
+- Never commit secrets or API keys

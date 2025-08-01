@@ -69,11 +69,11 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 USER appuser
 
 # Expose the FastAPI port
-EXPOSE 8000
+EXPOSE 7000
 
 # Add health check using curl (already installed)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/ || exit 1
+    CMD curl -f http://localhost:7000/ || exit 1
 
 # Set entrypoint to handle Xvfb
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

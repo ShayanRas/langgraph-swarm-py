@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: tiktok-swarm-app
     ports:
-      - "8000:8000"
+      - "7000:7000"
     environment:
       # OpenAI Configuration
       - OPENAI_API_KEY=${OPENAI_API_KEY}
@@ -31,6 +31,7 @@ services:
       - ENVIRONMENT=development
       - LOG_LEVEL=INFO
       - DOCKER_CONTAINER=true
+      - PORT=7000
     volumes:
       # Mount source code for hot reloading in development
       - ./src:/app/src:ro
@@ -45,7 +46,7 @@ services:
           memory: 1G
           cpus: '1.0'
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      test: ["CMD", "curl", "-f", "http://localhost:7000/"]
       interval: 30s
       timeout: 10s
       retries: 3

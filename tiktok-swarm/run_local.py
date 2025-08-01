@@ -52,7 +52,7 @@ if __name__ == "__main__":
     
     # Configuration
     host = "0.0.0.0" if in_docker else "127.0.0.1"
-    port = int(os.environ.get("PORT", 8000))
+    port = int(os.environ.get("PORT", 7000))
     reload = not in_docker and os.environ.get("ENVIRONMENT", "development") == "development"
     
     # Validate environment before starting
@@ -60,7 +60,7 @@ if __name__ == "__main__":
     
     print("🚀 Starting TikTok Swarm API...")
     print(f"📍 API will be available at: http://{host}:{port}")
-    print("📚 API docs at: http://localhost:8000/docs")
+    print(f"📚 API docs at: http://localhost:{port}/docs")
     if in_docker:
         print("🐳 Running in Docker container")
     print("\nPress CTRL+C to quit")
