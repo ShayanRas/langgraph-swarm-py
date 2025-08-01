@@ -14,6 +14,11 @@ class StealthConfigRequest(BaseModel):
     )
     headless: Optional[bool] = Field(default=None, description="Override headless mode (default: based on stealth level)")
     proxy_url: Optional[str] = Field(default=None, description="Proxy URL for requests (format: http://user:pass@host:port)")
+    use_proxy_rotation: bool = Field(default=True, description="Use proxy rotation from pool if available")
+    proxy_provider: Optional[Literal["webshare", "custom", "list"]] = Field(
+        default=None,
+        description="Proxy provider to use (default: from environment)"
+    )
 
 
 # Request Models

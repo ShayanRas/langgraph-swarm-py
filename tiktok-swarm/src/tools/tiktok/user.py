@@ -49,23 +49,48 @@ class UserAnalyzer(TikTokToolBase):
             user_info = await user.info()
             logger.debug(f"Received user info for {username}: {bool(user_info)}")
             
-            # Validate user data
-            if not user_info or not user_info.get("user"):
-                logger.warning(f"Empty or invalid user info returned for {username}: {user_info}")
+            # Validate user data - handle multiple response structures
+            if not user_info:
+                logger.warning(f"Empty user info returned for {username}")
                 return {
                     "success": False,
                     "username": username,
                     "error": "Invalid User Data",
-                    "message": f"No data available for user '@{username}'",
-                    "possible_causes": [
-                        "User account may be banned or suspended",
-                        "User has no public content",
-                        "Data temporarily unavailable"
-                    ],
-                    "suggestions": [
-                        "Try a different username",
-                        "Check if the account is active on TikTok"
-                    ]
+                    "message": f"No data available for user '@{username}'"
+                }
+            
+            # Check for successful API response
+            if user_info.get("statusCode") == 0 or user_info.get("status_code") == 0:
+                # Success response - check different possible structures
+                user_data = (user_info.get("userInfo", {}).get("user") or 
+                           user_info.get("user") or 
+                           user_info.get("data", {}).get("user"))
+                
+                stats_data = (user_info.get("userInfo", {}).get("stats") or
+                            user_info.get("stats") or
+                            user_info.get("data", {}).get("stats"))
+                
+                if user_data:
+                    # Restructure to expected format
+                    user_info["user"] = user_data
+                    if stats_data:
+                        user_info["stats"] = stats_data
+                else:
+                    logger.warning(f"User data structure not recognized for {username}: {list(user_info.keys())}")
+                    return {
+                        "success": False,
+                        "username": username,
+                        "error": "Unexpected API Response",
+                        "message": "User data returned in unexpected format",
+                        "raw_response_keys": list(user_info.keys())
+                    }
+            elif not user_info.get("user"):
+                logger.warning(f"No user field in response for {username}")
+                return {
+                    "success": False,
+                    "username": username,
+                    "error": "Invalid User Data",
+                    "message": f"No data available for user '@{username}'"
                 }
             
             # Get user's videos
@@ -156,9 +181,15 @@ class UserAnalyzer(TikTokToolBase):
             }
     
     def _format_user_info(self, user_data: Dict) -> Dict[str, Any]:
-        """Format user profile information"""
-        stats = user_data.get("stats", {})
-        user_detail = user_data.get("user", {})
+        """Format user profile information - handle multiple response structures"""
+        # Handle nested userInfo structure from API
+        if "userInfo" in user_data:
+            user_info = user_data["userInfo"]
+            stats = user_info.get("stats", {}) or user_info.get("statsV2", {})
+            user_detail = user_info.get("user", {})
+        else:
+            stats = user_data.get("stats", {}) or user_data.get("statsV2", {})
+            user_detail = user_data.get("user", {})
         
         return {
             "id": user_detail.get("id"),

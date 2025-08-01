@@ -12,6 +12,28 @@ logger = logging.getLogger(__name__)
 class VideoAnalyzer(TikTokToolBase):
     """Handles individual video analysis"""
     
+    async def get_video_by_url_or_id(self, api, url_or_id: str) -> Optional[Any]:
+        """Get video object handling both URLs and IDs"""
+        # If it's already a full URL, use it directly
+        if url_or_id.startswith(('http://', 'https://')):
+            return api.video(url=url_or_id)
+        
+        # If it's a numeric ID, we need more info
+        if url_or_id.isdigit():
+            # Try to get video info with just ID first
+            video = api.video(id=url_or_id)
+            # The API might require a URL for some operations
+            # We'll handle errors in the calling function
+            return video
+        
+        # Might be a short URL code
+        if len(url_or_id) < 20:  # Short codes are typically shorter
+            short_url = f"https://vm.tiktok.com/{url_or_id}"
+            return api.video(url=short_url)
+        
+        # Default: treat as ID
+        return api.video(id=url_or_id)
+    
     def extract_video_id(self, url_or_id: str) -> Optional[str]:
         """Extract video ID from URL or return ID if already provided"""
         # If it's already just an ID (numeric string)
@@ -38,11 +60,28 @@ class VideoAnalyzer(TikTokToolBase):
         try:
             api = await self.get_api_for_context(context)
             
-            # Get video object
-            video = api.video(id=video_id)
+            # Get video object handling both URLs and IDs
+            video = await self.get_video_by_url_or_id(api, video_id)
             
             # Get full video info
-            video_info = await video.info()
+            try:
+                video_info = await video.info()
+            except Exception as e:
+                if "url" in str(e).lower():
+                    # Try alternative approach - extract video info from URL
+                    logger.info(f"Trying alternative video info retrieval for ID: {video_id}")
+                    # If the ID approach doesn't work, we need the full URL
+                    return {
+                        "success": False,
+                        "video_id": video_id,
+                        "error": "Video URL Required",
+                        "message": "Please provide the full TikTok video URL instead of just the ID",
+                        "suggestions": [
+                            "Use the full URL like: https://www.tiktok.com/@username/video/123456",
+                            "Or use a short URL like: https://vm.tiktok.com/ABC123"
+                        ]
+                    }
+                raise
             
             # Format the video data
             formatted_video = self.format_video_data(video_info)

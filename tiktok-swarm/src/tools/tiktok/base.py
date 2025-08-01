@@ -15,11 +15,16 @@ def get_session_manager() -> UserScopedTikTokManager:
     """Get or create the global session manager"""
     global _session_manager
     if _session_manager is None:
+        import os
         _session_manager = UserScopedTikTokManager(
-            max_sessions_per_user=2,
-            session_timeout_seconds=300,
-            headless=True,  # Always headless in production
-            browser="chromium"
+            max_sessions_per_user=int(os.getenv("TIKTOK_MAX_SESSIONS_PER_USER", "2")),
+            session_timeout_seconds=int(os.getenv("TIKTOK_SESSION_TIMEOUT", "300")),
+            headless=os.getenv("TIKTOK_HEADLESS", "true").lower() == "true",
+            browser=os.getenv("TIKTOK_BROWSER", "chromium"),
+            stealth_level=os.getenv("TIKTOK_STEALTH_LEVEL", "aggressive"),
+            enable_proxy=os.getenv("TIKTOK_PROXY_ENABLED", "false").lower() == "true",
+            proxy_url=os.getenv("TIKTOK_PROXY_URL"),
+            random_browser=os.getenv("TIKTOK_RANDOM_BROWSER", "true").lower() == "true"
         )
     return _session_manager
 

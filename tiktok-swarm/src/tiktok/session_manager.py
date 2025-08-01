@@ -23,6 +23,7 @@ except ImportError:
         stealth_async = None
         STEALTH_NEW_API = None
 from .exceptions import TikTokAuthError, TikTokSessionError
+from .proxy_manager import ProxyManager, get_proxy_manager, ProxyConfig
 
 logger = logging.getLogger(__name__)
 
@@ -87,10 +88,11 @@ StealthLevel = Literal["none", "basic", "aggressive"]
 
 class UserSession:
     """Represents a user's TikTok session"""
-    def __init__(self, user_id: str, api: TikTokApi, ms_token: str):
+    def __init__(self, user_id: str, api: TikTokApi, ms_token: str, proxy: Optional[ProxyConfig] = None):
         self.user_id = user_id
         self.api = api
         self.ms_token = ms_token
+        self.proxy = proxy
         self.created_at = datetime.utcnow()
         self.last_used = datetime.utcnow()
         self.request_count = 0
@@ -119,7 +121,8 @@ class UserScopedTikTokManager:
         stealth_level: StealthLevel = "aggressive",
         enable_proxy: bool = False,
         proxy_url: Optional[str] = None,
-        random_browser: bool = True
+        random_browser: bool = True,
+        proxy_manager: Optional[ProxyManager] = None
     ):
         self._user_sessions: Dict[str, UserSession] = {}
         self._max_sessions_per_user = max_sessions_per_user
@@ -130,6 +133,7 @@ class UserScopedTikTokManager:
         self._enable_proxy = enable_proxy
         self._proxy_url = proxy_url
         self._random_browser = random_browser
+        self._proxy_manager = proxy_manager or (get_proxy_manager() if enable_proxy else None)
         self._lock = asyncio.Lock()
         self._cleanup_task: Optional[asyncio.Task] = None
         self._browser_types: List[BrowserType] = ["chromium", "webkit", "firefox"]
@@ -193,7 +197,22 @@ class UserScopedTikTokManager:
             return random.choice(self._browser_types)
         return self._browser
     
-    def _get_stealth_context_options(self) -> Dict[str, Any]:
+    def _proxy_to_tiktok_format(self, proxy: Optional[ProxyConfig]) -> Optional[List[Dict[str, str]]]:
+        """Convert ProxyConfig to TikTokApi expected format"""
+        if not proxy:
+            return None
+        
+        # TikTokApi expects a list of proxy dictionaries
+        proxy_dict = {"server": proxy.url}
+        
+        # Add authentication if available
+        if proxy.username and proxy.password:
+            proxy_dict["username"] = proxy.username
+            proxy_dict["password"] = proxy.password
+        
+        return [proxy_dict]
+    
+    async def _get_stealth_context_options(self, proxy: Optional[ProxyConfig] = None) -> Dict[str, Any]:
         """Generate stealth context options based on stealth level"""
         viewport = random.choice(VIEWPORT_SIZES)
         user_agent = random.choice(USER_AGENTS)
@@ -226,9 +245,8 @@ class UserScopedTikTokManager:
             # Add WebRTC leak prevention
             base_options["permissions"] = []  # Deny all permissions by default
         
-        # Add proxy if enabled
-        if self._enable_proxy and self._proxy_url:
-            base_options["proxy"] = {"server": self._proxy_url}
+        # Note: Proxy is now passed via TikTokApi's proxies parameter
+        # to avoid conflicts with playwright context creation
         
         return base_options
     
@@ -298,8 +316,17 @@ class UserScopedTikTokManager:
                 # Select browser type
                 browser_type = self._get_random_browser()
                 
-                # Get stealth context options
-                context_options = self._get_stealth_context_options()
+                # Get proxy from proxy manager if enabled
+                proxy = None
+                if self._enable_proxy and self._proxy_manager:
+                    proxy = await self._proxy_manager.get_proxy()
+                    if proxy:
+                        logger.info(f"Using proxy {proxy.url} for user {user_id}")
+                    else:
+                        logger.warning(f"No available proxy for user {user_id}")
+                
+                # Get stealth context options with proxy
+                context_options = await self._get_stealth_context_options(proxy)
                 
                 # Add human-like delay before creating session
                 await self._add_human_behavior(1.0, 3.0)
@@ -331,18 +358,26 @@ class UserScopedTikTokManager:
                     else:
                         use_headless = False
                 
+                # Convert proxy to TikTokApi format
+                tiktok_proxies = self._proxy_to_tiktok_format(proxy)
+                
+                # Handle static proxy if no dynamic proxy
+                if not tiktok_proxies and self._enable_proxy and self._proxy_url:
+                    tiktok_proxies = [{"server": self._proxy_url}]
+                
                 await api.create_sessions(
                     ms_tokens=[ms_token],
                     num_sessions=1,
                     headless=use_headless,
                     browser=browser_type,
+                    proxies=tiktok_proxies,  # Pass proxy via proxies parameter
                     sleep_after=5 if self._stealth_level != "none" else 3,
                     suppress_resource_load_types=["font"] if self._stealth_level == "aggressive" else ["image", "media", "font"],
                     context_options=context_options
                 )
                 
-                # Store session
-                session = UserSession(user_id, api, ms_token)
+                # Store session with proxy info
+                session = UserSession(user_id, api, ms_token, proxy)
                 self._user_sessions[user_id] = session
                 logger.info(f"Created new TikTok session for user {user_id}")
                 
@@ -350,7 +385,24 @@ class UserScopedTikTokManager:
                 
             except Exception as e:
                 logger.error(f"Failed to create TikTok session for user {user_id}: {e}")
+                # Report proxy failure if proxy was used
+                if proxy and self._proxy_manager:
+                    await self._proxy_manager.report_failure(proxy, str(e))
                 raise TikTokAuthError(f"Failed to create TikTok session: {str(e)}")
+    
+    async def report_request_success(self, user_id: str, response_time: float = 0):
+        """Report successful request for proxy tracking"""
+        if user_id in self._user_sessions:
+            session = self._user_sessions[user_id]
+            if session.proxy and self._proxy_manager:
+                await self._proxy_manager.report_success(session.proxy, response_time)
+    
+    async def report_request_failure(self, user_id: str, error: str):
+        """Report failed request for proxy tracking"""
+        if user_id in self._user_sessions:
+            session = self._user_sessions[user_id]
+            if session.proxy and self._proxy_manager:
+                await self._proxy_manager.report_failure(session.proxy, error)
     
     async def remove_user_session(self, user_id: str):
         """Manually remove a user's session"""
@@ -376,16 +428,23 @@ class UserScopedTikTokManager:
                 "created_at": session.created_at.isoformat(),
                 "last_used": session.last_used.isoformat(),
                 "request_count": session.request_count,
-                "is_expired": session.is_expired(self._session_timeout)
+                "is_expired": session.is_expired(self._session_timeout),
+                "proxy": session.proxy.url if session.proxy else None
             })
         
-        return {
+        stats = {
             "total_sessions": total_sessions,
             "unique_users": users_with_sessions,
             "max_sessions_per_user": self._max_sessions_per_user,
             "session_timeout_seconds": self._session_timeout,
             "sessions": session_details
         }
+        
+        # Add proxy stats if available
+        if self._proxy_manager:
+            stats["proxy_stats"] = self._proxy_manager.get_stats()
+        
+        return stats
     
     async def health_check(self) -> Dict[str, Any]:
         """Health check for session manager"""

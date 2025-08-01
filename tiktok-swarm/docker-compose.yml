@@ -27,6 +27,14 @@ services:
       - TIKTOK_PROXY_ENABLED=${TIKTOK_PROXY_ENABLED:-false}
       - TIKTOK_PROXY_URL=${TIKTOK_PROXY_URL}
       
+      # Proxy Configuration
+      - PROXY_PROVIDER=${PROXY_PROVIDER:-custom}
+      - WEBSHARE_API_KEY=${WEBSHARE_API_KEY}
+      - WEBSHARE_MODE=${WEBSHARE_MODE:-direct}
+      - PROXY_LIST=${PROXY_LIST}
+      - PROXY_ROTATION_STRATEGY=${PROXY_ROTATION_STRATEGY:-health_based}
+      - PROXY_TEST_ON_INIT=${PROXY_TEST_ON_INIT:-true}
+      
       # Application Configuration
       - ENVIRONMENT=development
       - LOG_LEVEL=INFO

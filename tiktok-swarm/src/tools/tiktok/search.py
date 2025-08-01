@@ -16,24 +16,60 @@ class ContentSearcher(TikTokToolBase):
         try:
             api = await self.get_api_for_context(context)
             
-            # Note: TikTokApi search requires the user to have performed a search before
-            # This is a limitation of the unofficial API
-            logger.warning("Search functionality requires prior search history in the MS token session")
-            
-            # For now, we'll use hashtag search as a workaround
-            # Clean the query to use as a hashtag
-            hashtag_query = query.replace(" ", "").lower()
-            
-            # Try to find videos with this hashtag
-            hashtag = api.hashtag(name=hashtag_query)
-            
+            # Try user search first (requires prior search history)
+            search_worked = False
             videos = []
-            async for video in hashtag.videos(count=count):
+            
+            try:
+                # Attempt direct search
+                logger.debug(f"Attempting direct search for: {query}")
+                search_results = []
+                async for user in api.search.users(query, count=1):
+                    search_results.append(user)
+                    search_worked = True
+                    break
+                
+                if search_worked:
+                    # If user search worked, we can try general search
+                    logger.info(f"Search capability enabled, searching for: {query}")
+                    # Note: The API doesn't have a direct video search, using hashtag approach
+            except Exception as e:
+                logger.debug(f"Direct search not available: {e}")
+                search_worked = False
+            
+            # Fallback to hashtag search
+            if not search_worked:
+                logger.info("Using hashtag search as fallback")
+            
+            # Process query for hashtag search
+            # Handle multi-word queries better
+            hashtags_to_try = []
+            
+            # Try exact match first (remove spaces)
+            hashtags_to_try.append(query.replace(" ", "").lower())
+            
+            # Try individual words as hashtags
+            words = query.lower().split()
+            hashtags_to_try.extend(words)
+            
+            # Try to find videos with these hashtags
+            for hashtag_query in hashtags_to_try:
+                if len(videos) >= count:
+                    break
+                    
                 try:
-                    video_data = self.format_video_data(video.as_dict)
-                    videos.append(video_data)
+                    hashtag = api.hashtag(name=hashtag_query)
+                    remaining_count = count - len(videos)
+                    
+                    async for video in hashtag.videos(count=remaining_count):
+                        try:
+                            video_data = self.format_video_data(video.as_dict)
+                            videos.append(video_data)
+                        except Exception as e:
+                            logger.warning(f"Failed to format video: {e}")
+                            continue
                 except Exception as e:
-                    logger.warning(f"Failed to format video: {e}")
+                    logger.debug(f"Hashtag '{hashtag_query}' search failed: {e}")
                     continue
             
             if not videos:

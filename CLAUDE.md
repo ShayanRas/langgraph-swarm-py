@@ -204,8 +204,9 @@ mcp_tools = await client.get_tools()
 
 ### TikTok Bot Detection
 - Use aggressive or paranoid stealth mode
-- Enable proxy support for IP rotation
+- Enable proxy support for IP rotation (see tiktok-swarm/PROXY_GUIDE.md)
 - Implement retry logic with backoff
+- Configure webshare or custom proxies via environment variables
 
 ### Memory Management
 - Browser sessions auto-cleanup after timeout
