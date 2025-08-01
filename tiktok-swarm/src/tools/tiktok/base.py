@@ -1,5 +1,6 @@
 """Base class for TikTok tools"""
 import logging
+import re
 from typing import Dict, Any, Optional
 from src.tiktok.session_manager import UserScopedTikTokManager
 from src.tiktok.exceptions import TikTokAuthError, TikTokSessionError, TikTokDataError
@@ -51,33 +52,133 @@ class TikTokToolBase:
         return await self.session_manager.get_api_for_user(user_id, ms_token)
     
     def format_error(self, error: Exception) -> Dict[str, Any]:
-        """Format error response consistently"""
+        """Format error response with detailed information"""
         error_type = type(error).__name__
         error_message = str(error)
         
-        if isinstance(error, TikTokAuthError):
+        # Log the full error for debugging
+        logger.error(f"Full error details: {error_type}: {error_message}")
+        
+        # Parse statusCode errors
+        status_code = None
+        if "statusCode:" in error_message:
+            try:
+                # Extract statusCode from error message
+                match = re.search(r'statusCode:\s*(-?\d+)', error_message)
+                if match:
+                    status_code = int(match.group(1))
+            except:
+                pass
+        
+        # Handle TikTokApi library bug with malformed exceptions
+        if "missing 2 required positional arguments" in error_message and "TikTokException" in error_message:
+            # Extract the actual error details from the message
+            actual_error = "Unknown error"
+            possible_causes = []
+            suggestions = []
+            
+            if "statusCode: -1" in error_message:
+                actual_error = "TikTok API request failed with statusCode: -1"
+                if "userInfo: {}" in error_message:
+                    possible_causes = [
+                        "User does not exist or is not accessible",
+                        "User account may be private",
+                        "MS token may be invalid or expired",
+                        "Rate limit may have been exceeded"
+                    ]
+                    suggestions = [
+                        "Verify the username is correct",
+                        "Check if the user account is public",
+                        "Get a fresh MS token",
+                        "Wait a few minutes before retrying"
+                    ]
+                else:
+                    possible_causes = [
+                        "MS token may be invalid or expired", 
+                        "Bot detection triggered",
+                        "Network connectivity issues",
+                        "TikTok API temporary failure"
+                    ]
+                    suggestions = [
+                        "Get a fresh MS token from TikTok",
+                        "Enable stealth mode and retry",
+                        "Try a different browser type",
+                        "Wait a few minutes before retrying"
+                    ]
+            
+            return {
+                "error": "TikTok API Error",
+                "message": actual_error,
+                "raw_error": error_message,
+                "status_code": status_code,
+                "possible_causes": possible_causes,
+                "suggestions": suggestions
+            }
+        
+        # Handle authentication errors
+        if isinstance(error, TikTokAuthError) or "auth" in error_message.lower():
             return {
                 "error": "Authentication Error",
                 "message": error_message,
-                "action_required": "Please configure your TikTok MS token"
+                "status_code": status_code,
+                "possible_causes": ["MS token is missing or invalid"],
+                "suggestions": ["Configure a valid TikTok MS token"]
             }
+        
+        # Handle session errors
         elif isinstance(error, TikTokSessionError):
             return {
                 "error": "Session Error",
                 "message": error_message,
-                "action_required": "Please try again or contact support"
+                "status_code": status_code,
+                "possible_causes": ["Session limit reached", "Session expired"],
+                "suggestions": ["Wait a moment and retry", "Restart the container if issue persists"]
             }
+        
+        # Handle data errors
         elif isinstance(error, TikTokDataError):
             return {
-                "error": "Data Error", 
+                "error": "Data Error",
                 "message": error_message,
-                "action_required": "The requested data could not be retrieved"
+                "status_code": status_code,
+                "possible_causes": ["Content not available", "Invalid request parameters"],
+                "suggestions": ["Verify the requested data exists", "Check request parameters"]
             }
+        
+        # Handle rate limiting
+        elif "rate limit" in error_message.lower() or status_code == 429:
+            return {
+                "error": "Rate Limit Error",
+                "message": "Too many requests to TikTok API",
+                "status_code": status_code or 429,
+                "possible_causes": ["API rate limit exceeded"],
+                "suggestions": ["Wait 5-10 minutes before retrying", "Reduce request frequency"]
+            }
+        
+        # Handle bot detection
+        elif "bot" in error_message.lower() or "captcha" in error_message.lower():
+            return {
+                "error": "Bot Detection Error",
+                "message": "TikTok detected automated access",
+                "status_code": status_code,
+                "possible_causes": ["Bot detection triggered", "Captcha required"],
+                "suggestions": [
+                    "Enable stealth mode",
+                    "Use a different browser type",
+                    "Add proxy configuration",
+                    "Get a fresh MS token"
+                ]
+            }
+        
+        # Default error response with preserved details
         else:
             return {
                 "error": error_type,
                 "message": error_message,
-                "action_required": "An unexpected error occurred"
+                "raw_error": error_message,
+                "status_code": status_code,
+                "possible_causes": ["Unknown error occurred"],
+                "suggestions": ["Check logs for more details", "Contact support if issue persists"]
             }
     
     def format_video_data(self, video_dict: Dict[str, Any]) -> Dict[str, Any]:

@@ -4,6 +4,7 @@ from langchain_core.tools import tool
 from .base import TikTokToolBase
 import logging
 import os
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -14,16 +15,58 @@ class UserAnalyzer(TikTokToolBase):
     async def analyze_user(self, username: str, video_count: int, context: Dict[str, Any]) -> Dict[str, Any]:
         """Analyze a TikTok user's profile and content"""
         try:
+            # Log the request
+            logger.info(f"Analyzing user profile: {username} (video_count: {video_count})")
+            
             api = await self.get_api_for_context(context)
             
             # Remove @ if present
             username = username.lstrip('@')
             
+            # Basic username validation
+            if not username or len(username) < 2:
+                return {
+                    "success": False,
+                    "username": username,
+                    "error": "Invalid Username",
+                    "message": "Username must be at least 2 characters long"
+                }
+            
+            # Check for invalid characters (TikTok usernames are alphanumeric with . and _)
+            if not re.match(r'^[a-zA-Z0-9._]+$', username):
+                return {
+                    "success": False,
+                    "username": username,
+                    "error": "Invalid Username",
+                    "message": "Username can only contain letters, numbers, dots, and underscores"
+                }
+            
             # Get user object
             user = api.user(username=username)
             
             # Get user info
+            logger.debug(f"Fetching info for user: {username}")
             user_info = await user.info()
+            logger.debug(f"Received user info for {username}: {bool(user_info)}")
+            
+            # Validate user data
+            if not user_info or not user_info.get("user"):
+                logger.warning(f"Empty or invalid user info returned for {username}: {user_info}")
+                return {
+                    "success": False,
+                    "username": username,
+                    "error": "Invalid User Data",
+                    "message": f"No data available for user '@{username}'",
+                    "possible_causes": [
+                        "User account may be banned or suspended",
+                        "User has no public content",
+                        "Data temporarily unavailable"
+                    ],
+                    "suggestions": [
+                        "Try a different username",
+                        "Check if the account is active on TikTok"
+                    ]
+                }
             
             # Get user's videos
             videos = []
@@ -98,11 +141,18 @@ class UserAnalyzer(TikTokToolBase):
             }
             
         except Exception as e:
-            logger.error(f"Error analyzing user {username}: {e}")
+            # Log detailed error information
+            logger.error(f"Error analyzing user {username}: {type(e).__name__}: {str(e)}")
+            logger.debug(f"Full error traceback for {username}:", exc_info=True)
+            
+            # Format the error response with all details
+            error_response = self.format_error(e)
+            
+            # Add username to the response
             return {
                 "success": False,
                 "username": username,
-                **self.format_error(e)
+                **error_response
             }
     
     def _format_user_info(self, user_data: Dict) -> Dict[str, Any]:
