@@ -186,6 +186,38 @@ class TikTokToolBase:
                 "suggestions": ["Check logs for more details", "Contact support if issue persists"]
             }
     
+    def safe_int(self, value: Any, default: int = 0) -> int:
+        """Safely convert a value to integer, handling strings and None values"""
+        if value is None:
+            return default
+        
+        # If already an integer, return it
+        if isinstance(value, int):
+            return value
+        
+        # If it's a string, try to convert
+        if isinstance(value, str):
+            # Handle empty strings
+            if not value.strip():
+                return default
+            
+            # Remove commas from numbers like "1,234,567"
+            value = value.replace(',', '')
+            
+            try:
+                # Try to convert to float first (handles "123.0") then to int
+                return int(float(value))
+            except (ValueError, TypeError):
+                logger.warning(f"Could not convert '{value}' to int, using default {default}")
+                return default
+        
+        # Try direct conversion for other types
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            logger.warning(f"Could not convert {type(value).__name__} '{value}' to int, using default {default}")
+            return default
+    
     def format_video_data(self, video_dict: Dict[str, Any]) -> Dict[str, Any]:
         """Extract and format video data consistently"""
         stats = video_dict.get("stats", {})
@@ -200,14 +232,14 @@ class TikTokToolBase:
                 "username": author.get("uniqueId", ""),
                 "nickname": author.get("nickname", ""),
                 "verified": author.get("verified", False),
-                "follower_count": author.get("followerCount", 0)
+                "follower_count": self.safe_int(author.get("followerCount", 0))
             },
             "stats": {
-                "views": stats.get("playCount", 0),
-                "likes": stats.get("diggCount", 0),
-                "comments": stats.get("commentCount", 0),
-                "shares": stats.get("shareCount", 0),
-                "saves": stats.get("collectCount", 0)
+                "views": self.safe_int(stats.get("playCount", 0)),
+                "likes": self.safe_int(stats.get("diggCount", 0)),
+                "comments": self.safe_int(stats.get("commentCount", 0)),
+                "shares": self.safe_int(stats.get("shareCount", 0)),
+                "saves": self.safe_int(stats.get("collectCount", 0))
             },
             "music": {
                 "title": music.get("title", ""),

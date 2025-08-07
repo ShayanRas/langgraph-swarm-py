@@ -199,10 +199,10 @@ class UserAnalyzer(TikTokToolBase):
             "bio": user_detail.get("signature", ""),
             "avatar_url": user_detail.get("avatarLarger"),
             "stats": {
-                "follower_count": stats.get("followerCount", 0),
-                "following_count": stats.get("followingCount", 0),
-                "video_count": stats.get("videoCount", 0),
-                "heart_count": stats.get("heartCount", 0)  # Total likes received
+                "follower_count": self.safe_int(stats.get("followerCount", 0)),
+                "following_count": self.safe_int(stats.get("followingCount", 0)),
+                "video_count": self.safe_int(stats.get("videoCount", 0)),
+                "heart_count": self.safe_int(stats.get("heartCount", 0))  # Total likes received
             }
         }
     

@@ -100,17 +100,10 @@ async def analyze_video(
     try:
         context_dict = user_context.to_config_dict()
         
-        # Extract video ID
-        video_id = video_analyzer.extract_video_id(request.video_url_or_id)
-        if not video_id:
-            return VideoResponse(
-                success=False,
-                error="Invalid video URL or ID",
-                message="Please provide a valid TikTok video URL or numeric video ID"
-            )
-        
+        # Pass the full URL or ID to the analyzer
+        # The analyzer will handle both URLs and IDs internally
         result = await video_analyzer.analyze_single_video(
-            video_id,
+            request.video_url_or_id,
             context_dict
         )
         
@@ -137,19 +130,17 @@ async def get_video_details(
     try:
         context_dict = user_context.to_config_dict()
         
-        # Extract video ID
-        video_id = video_analyzer.extract_video_id(request.video_url_or_id)
-        if not video_id:
-            return VideoDetailsResponse(
-                success=False,
-                error="Invalid video URL or ID",
-                message="Please provide a valid TikTok video URL or numeric video ID"
-            )
-        
         # Get API instance
         api = await video_analyzer.get_api_for_context(context_dict)
-        video = api.video(id=video_id)
+        
+        # Get video object handling both URLs and IDs
+        video = await video_analyzer.get_video_by_url_or_id(api, request.video_url_or_id)
+        
+        # Get full video info
         video_info = await video.info()
+        
+        # Extract video ID for response (optional, for backwards compatibility)
+        video_id = video_analyzer.extract_video_id(request.video_url_or_id) or request.video_url_or_id
         
         return VideoDetailsResponse(
             success=True,

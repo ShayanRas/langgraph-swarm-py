@@ -55,13 +55,13 @@ class VideoAnalyzer(TikTokToolBase):
         
         return None
     
-    async def analyze_single_video(self, video_id: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Analyze a single video in detail"""
+    async def analyze_single_video(self, video_url_or_id: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Analyze a single video in detail - accepts both URLs and IDs"""
         try:
             api = await self.get_api_for_context(context)
             
             # Get video object handling both URLs and IDs
-            video = await self.get_video_by_url_or_id(api, video_id)
+            video = await self.get_video_by_url_or_id(api, video_url_or_id)
             
             # Get full video info
             try:
@@ -69,11 +69,11 @@ class VideoAnalyzer(TikTokToolBase):
             except Exception as e:
                 if "url" in str(e).lower():
                     # Try alternative approach - extract video info from URL
-                    logger.info(f"Trying alternative video info retrieval for ID: {video_id}")
+                    logger.info(f"Trying alternative video info retrieval for: {video_url_or_id}")
                     # If the ID approach doesn't work, we need the full URL
                     return {
                         "success": False,
-                        "video_id": video_id,
+                        "video_id": video_url_or_id,
                         "error": "Video URL Required",
                         "message": "Please provide the full TikTok video URL instead of just the ID",
                         "suggestions": [
@@ -123,10 +123,10 @@ class VideoAnalyzer(TikTokToolBase):
             }
             
         except Exception as e:
-            logger.error(f"Error analyzing video {video_id}: {e}")
+            logger.error(f"Error analyzing video {video_url_or_id}: {e}")
             return {
                 "success": False,
-                "video_id": video_id,
+                "video_id": video_url_or_id,
                 **self.format_error(e)
             }
     
@@ -194,15 +194,8 @@ async def analyze_video(state: Dict[str, Any], video_url_or_id: str) -> Dict[str
                 "action_required": "Sign in and configure your MS token"
             }
         
-        video_id = _video_analyzer.extract_video_id(video_url_or_id)
-        if not video_id:
-            return {
-                "success": False,
-                "error": "Invalid video URL or ID",
-                "message": "Please provide a valid TikTok video URL or numeric video ID"
-            }
-        
-        return await _video_analyzer.analyze_single_video(video_id, user_context)
+        # Pass the full URL or ID to the analyzer
+        return await _video_analyzer.analyze_single_video(video_url_or_id, user_context)
     
     # Use API client to call endpoint
     from src.tools.api_client import TikTokAPIClient
